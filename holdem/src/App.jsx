@@ -182,7 +182,8 @@ export default function App() {
                       sfx.click()
                       nextHand()
                     }}
-                    className="rounded-xl bg-brass-500 px-8 py-3 text-base font-black text-black shadow-lg shadow-brass-500/25 hover:bg-brass-400"
+                    // Above the showdown board (z-30), which is still on screen.
+                    className="relative z-40 rounded-xl bg-brass-500 px-8 py-3 text-base font-black text-black shadow-lg shadow-brass-500/25 hover:bg-brass-400"
                   >
                     다음 핸드 →
                   </motion.button>

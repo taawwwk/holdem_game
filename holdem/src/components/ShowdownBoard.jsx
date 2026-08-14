@@ -105,12 +105,14 @@ export default function ShowdownBoard({ players, winnerIds, payouts }) {
     (a, b) => (a.handResult?.score ?? 0) - (b.handResult?.score ?? 0),
   )
 
+  // Nothing on this board is interactive, and it stays up through `handEnd` —
+  // so it must not swallow the clicks meant for the next-hand button beneath it.
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-30 flex items-center justify-center bg-felt-950/80 px-4 backdrop-blur-[3px]"
+      className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-felt-950/80 px-4 backdrop-blur-[3px]"
     >
       <div className="w-full max-w-xl">
         <motion.div
