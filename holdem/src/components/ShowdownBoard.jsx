@@ -21,7 +21,7 @@ function HandRow({ player, rank, isWinner, payout, delay, total }) {
       initial={{ opacity: 0, x: -28 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay, type: 'spring', stiffness: 220, damping: 26 }}
-      className={`relative flex items-center gap-3 rounded-xl border px-3 py-2 ${
+      className={`relative flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3 py-2 ${
         isWinner
           ? 'border-brass-400/70 bg-brass-500/10'
           : 'border-emerald-400/10 bg-felt-900/60'
@@ -42,7 +42,9 @@ function HandRow({ player, rank, isWinner, payout, delay, total }) {
         <span className="min-w-0 truncate text-sm font-bold text-white">{player.name}</span>
       </div>
 
-      <div className="flex items-end gap-1">
+      {/* Name and result share the first line on a phone; the five cards need
+          more width than that leaves, so they drop to a line of their own. */}
+      <div className="order-last flex w-full items-end gap-1 sm:order-none sm:w-auto">
         {best.map((card, i) => (
           <div key={card.id} className="flex flex-col items-center gap-1">
             {/* Never dimmed — reading the losing hands is the whole point. */}
