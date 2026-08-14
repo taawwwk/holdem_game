@@ -99,22 +99,24 @@ function HandRow({ player, rank, isWinner, payout, delay, total }) {
  * The showdown reveal: every player still in the hand gets their best five
  * cards laid out in order, weakest first, so the winning hand lands last.
  */
-export default function ShowdownBoard({ players, winnerIds, payouts }) {
+export default function ShowdownBoard({ players, winnerIds, payouts, onNext }) {
   const contenders = players.filter((p) => !p.folded && !p.out && p.handResult)
   const ranked = [...contenders].sort(
     (a, b) => (a.handResult?.score ?? 0) - (b.handResult?.score ?? 0),
   )
 
-  // Nothing on this board is interactive, and it stays up through `handEnd` —
-  // so it must not swallow the clicks meant for the next-hand button beneath it.
+  // The backdrop itself takes no clicks; the panel inside it does, so the board
+  // can be scrolled and the next-hand button can be pressed.
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-felt-950/80 px-4 backdrop-blur-[3px]"
+      className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-felt-950/80 px-4 py-3 backdrop-blur-[3px]"
     >
-      <div className="w-full max-w-xl">
+      {/* A crowded showdown can outgrow a short screen — scroll inside the
+          panel rather than pushing the reveal off the bottom of the table. */}
+      <div className="pointer-events-auto flex max-h-full w-full max-w-xl flex-col overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -151,6 +153,21 @@ export default function ShowdownBoard({ players, winnerIds, payouts }) {
             <span className="h-1 w-5 rounded-full bg-emerald-400/25" /> 공용 카드
           </span>
         </motion.div>
+
+        {/* The hand is over: continue from where the player is already looking,
+            instead of a button at the far bottom of the table. */}
+        {onNext && (
+          <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onNext}
+            className="mt-3 shrink-0 self-center rounded-xl bg-brass-500 px-8 py-3 text-base font-black text-black shadow-lg shadow-brass-500/25 hover:bg-brass-400"
+          >
+            다음 핸드 →
+          </motion.button>
+        )}
       </div>
     </motion.div>
   )
