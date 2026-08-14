@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-felt-950: #04140d;
+  --color-felt-900: #062018;
+  --color-felt-800: #0a3325;
+  --color-felt-700: #0f4a34;
+  --color-felt-600: #146b47;
+  --color-brass-400: #e6c274;
+  --color-brass-500: #c9a24d;
+  --color-brass-600: #9c7a2e;
+
+  --font-display: 'Bebas Neue', 'Oswald', system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #04140d;
+  color: #e8f3ee;
+  font-family: ui-sans-serif, system-ui, 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Radial felt with a subtle woven texture on top. */
+.felt-surface {
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 42%, #17754e 0%, #0d4a32 45%, #072a1d 78%, #041710 100%);
+  position: relative;
+}
+
+.felt-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 4px);
+}
+
+.table-rail {
+  background: linear-gradient(160deg, #4a3520 0%, #2a1d12 45%, #16100a 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(230, 194, 116, 0.28),
+    inset 0 -3px 12px rgba(0, 0, 0, 0.7),
+    0 30px 60px -20px rgba(0, 0, 0, 0.9);
+}
+
+.card-face {
+  background: linear-gradient(160deg, #ffffff 0%, #f2f4f7 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 8px 18px -8px rgba(0, 0, 0, 0.6);
+}
+
+.card-back {
+  background:
+    repeating-linear-gradient(45deg, #1e3a8a 0 6px, #172e6e 6px 12px);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 3px #142657,
+    0 6px 14px -6px rgba(0, 0, 0, 0.8);
+}
+
+.chip-glow {
+  box-shadow:
+    0 0 0 1px rgba(230, 194, 116, 0.45),
+    0 0 26px -4px rgba(230, 194, 116, 0.4);
+}
+
+.text-shadow-strong {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(230, 194, 116, 0.25);
+  border-radius: 999px;
+}

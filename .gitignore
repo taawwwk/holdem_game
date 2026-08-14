@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+.vite
+*.local
+
+# Machine-local Claude Code permissions, not shared
+.claude/settings.local.json
