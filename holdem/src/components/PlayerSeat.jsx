@@ -38,6 +38,7 @@ function BetChips({ amount }) {
 
 export default function PlayerSeat({
   player,
+  CardComponent = PlayingCard,
   isDealer,
   isActing,
   isWinner,
@@ -66,7 +67,7 @@ export default function PlayerSeat({
         <div className="flex gap-1">
           <AnimatePresence>
             {player.hole.map((card, i) => (
-              <PlayingCard
+              <CardComponent
                 key={card.id}
                 card={card}
                 index={i}

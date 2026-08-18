@@ -8,7 +8,15 @@ const QUICK = [
   { label: '팟', fraction: 1 },
 ]
 
-export default function BettingControls({ player, legal, state, pot, onAct, disabled }) {
+export default function BettingControls({
+  player,
+  legal,
+  state,
+  pot,
+  onAct,
+  disabled,
+  foldLabel = 'Fold',
+}) {
   const [raiseTo, setRaiseTo] = useState(legal?.minRaiseTotal ?? 0)
 
   // Reset the slider whenever the price of poker changes.
@@ -89,7 +97,7 @@ export default function BettingControls({ player, legal, state, pot, onAct, disa
           className={`${btn} bg-slate-700/80 text-slate-100 hover:bg-slate-600`}
         >
           <X className="h-4 w-4" />
-          Fold
+          {foldLabel}
         </motion.button>
 
         {legal.canCheck ? (
