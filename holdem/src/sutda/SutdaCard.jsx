@@ -1,8 +1,6 @@
 import { forwardRef } from 'react'
 import { motion } from 'framer-motion'
 
-import HwatuArt from './HwatuArt'
-
 const SIZES = {
   sm: { box: 'w-10 h-14', round: 'rounded-[5px]', num: 'text-[9px]', name: 'hidden' },
   md: { box: 'w-14 h-20', round: 'rounded-md', num: 'text-xs', name: 'text-[8px]' },
@@ -51,7 +49,11 @@ const SutdaCard = forwardRef(function SutdaCard(
               card.gwang ? 'hwatu-gwang' : ''
             }`}
           >
-            <HwatuArt month={card.month} gwang={card.gwang} />
+            <img
+              src={`/cards/${card.id}.jpg`}
+              alt={`${card.month}월`}
+              className="pointer-events-none h-full w-full object-cover"
+            />
 
             {/* Month index in the corner — the painting alone is hard to read
                 at seat size, and Sutda is decided by the number. Nothing else
