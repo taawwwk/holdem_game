@@ -20,9 +20,22 @@ import {
 
 export { selectLegalActions }
 
-/** One card each, a round of betting, the second card, then another round. */
-export const STREETS = ['first', 'second']
-export const STREET_LABEL = { first: '첫 장', second: '두 번째 장' }
+/**
+ * Hold'em Sutda: one card each and a bet, the shared card turned face up and
+ * another bet, then the last private card and a final bet.
+ *
+ * Rematch (구사/멍구사): the community card is dealt face-up immediately,
+ * each player receives one private card, a single betting round follows,
+ * and the hand is settled — two cards only.
+ */
+export const STREETS = ['first', 'community', 'third']
+export const REMATCH_STREETS = ['rematch']
+export const STREET_LABEL = {
+  first: '첫 장',
+  community: '공유카드',
+  third: '마지막 장',
+  rematch: '재경기',
+}
 
 const LABELS = { fold: '다이', foldLog: '다이', raiseLog: '레이즈' }
 
@@ -30,6 +43,7 @@ export const initialState = {
   phase: 'setup', // setup | shuffle | dealing | betting | showdown | handEnd | gameOver
   street: 'first',
   players: [],
+  community: [], // the single shared card, once it is turned over
   deck: [],
   deckCursor: 0,
   currentBet: 0,
@@ -40,6 +54,7 @@ export const initialState = {
   ante: 10,
   startingChips: 1000,
   carryPot: 0, // dead money rolled over from a hand voided by 구사
+  rematch: false, // true when replaying after 구사 (2-card mode)
   rules: DEFAULT_RULES,
   roundComplete: false,
   runout: false,
@@ -100,7 +115,7 @@ function setupGame(state, { botCount, startingChips, ante, rules }) {
   }
 }
 
-function beginHand(state, { keepDealer = false, carryPot = 0 } = {}) {
+function beginHand(state, { keepDealer = false, carryPot = 0, rematch = false } = {}) {
   const players = freshHandPlayers(state.players)
   if (seatOrder(players).length < 2) {
     return { ...state, players, phase: 'gameOver' }
@@ -111,13 +126,15 @@ function beginHand(state, { keepDealer = false, carryPot = 0 } = {}) {
     players,
     dealerIndex: keepDealer ? state.dealerIndex : rotateButton(players, state.dealerIndex),
     handNumber: state.handNumber + 1,
+    community: [],
     deck: [],
     deckCursor: 0,
-    street: 'first',
+    street: rematch ? 'rematch' : 'first',
     currentBet: 0,
     minRaise: state.ante,
     actingIndex: -1,
     carryPot,
+    rematch,
     roundComplete: false,
     runout: false,
     results: null,
@@ -133,10 +150,51 @@ function dealHand(state, method) {
   const dealerPos = seats.indexOf(state.dealerIndex)
   const order = seats.map((_, i) => seats[(dealerPos + 1 + i) % seats.length])
 
-  // Everyone antes up, then takes a single card face down.
+  // Everyone antes up.
   for (const seat of order) postAnte(players[seat], state.ante)
 
   let cursor = 0
+
+  if (state.rematch) {
+    // ── Rematch mode (구사 재경기) ──────────────────────────────
+    // Community card dealt face-up immediately, then one private card each.
+    // A single betting round follows, then straight to showdown.
+    const community = [deck[cursor++]]
+    for (const seat of order) players[seat].hole.push(deck[cursor++])
+
+    const firstSeat = order[0]
+    const draft = { ...state, players, currentBet: 0, minRaise: state.ante }
+    const preComplete = isRoundComplete(draft)
+    const actingIndex = players[firstSeat].folded || players[firstSeat].allIn
+      ? nextActor(players, (firstSeat + players.length - 1) % players.length)
+      : firstSeat
+
+    let next = {
+      ...state,
+      deck,
+      deckCursor: cursor,
+      community,
+      players,
+      currentBet: 0,
+      minRaise: state.ante,
+      actingIndex: preComplete ? -1 : actingIndex,
+      street: 'rematch',
+      roundComplete: preComplete,
+      runout: preComplete,
+      shuffleMethod: method,
+      phase: 'dealing',
+    }
+    const carry = state.carryPot > 0 ? ` · 이월 ${state.carryPot}` : ''
+    next.log = logLine(
+      next,
+      `${next.handNumber}판 재경기 — 공유카드 ${cardLabel(community[0])} · 앤티 ${state.ante}${carry}`,
+      'system',
+    )
+    return next
+  }
+
+  // ── Normal mode ──────────────────────────────────────────────
+  // Each player gets one card face down.
   for (const seat of order) players[seat].hole.push(deck[cursor++])
 
   // The ante is not a bet, so the first round opens with nothing to call.
@@ -151,6 +209,7 @@ function dealHand(state, method) {
     ...state,
     deck,
     deckCursor: cursor,
+    community: [],
     players,
     currentBet: 0,
     minRaise: state.ante,
@@ -177,7 +236,13 @@ function advanceStreet(state) {
     return settle(state, { uncontested: true })
   }
 
-  if (state.street === STREETS[STREETS.length - 1]) {
+  // Rematch has only one street — go straight to showdown after betting.
+  if (state.rematch) {
+    return settle(state, { uncontested: false })
+  }
+
+  const streets = STREETS
+  if (state.street === streets[streets.length - 1]) {
     return settle(state, { uncontested: false })
   }
 
@@ -187,16 +252,27 @@ function advanceStreet(state) {
   const dealerPos = seats.indexOf(state.dealerIndex)
   const order = seats.map((_, i) => seats[(dealerPos + 1 + i) % seats.length])
 
-  // Second card goes to everyone still holding; a folded seat burns its card
-  // so the deal stays honest. Rebuild `hole` rather than pushing into it —
-  // collectBets only shallow-copies, so the array is still shared with the
-  // previous state and a re-run of this reducer would deal the card twice.
   let cursor = state.deckCursor
-  for (const seat of order) {
-    if (!players[seat].folded) {
-      players[seat] = { ...players[seat], hole: [...players[seat].hole, state.deck[cursor]] }
-    }
+  let community = state.community
+  let logText
+
+  if (state.street === 'first') {
+    // The shared card goes face up in the middle — everyone plays off it.
+    community = [state.deck[cursor]]
     cursor += 1
+    logText = `공유카드 — ${cardLabel(community[0])}`
+  } else {
+    // The last private card. A folded seat still burns one so the deal stays
+    // honest. Rebuild `hole` rather than pushing into it: collectBets only
+    // shallow-copies, so the array is shared with the previous state and a
+    // re-run of this reducer would otherwise deal the same card twice.
+    for (const seat of order) {
+      if (!players[seat].folded) {
+        players[seat] = { ...players[seat], hole: [...players[seat].hole, state.deck[cursor]] }
+      }
+      cursor += 1
+    }
+    logText = '마지막 장'
   }
 
   const firstSeat = order[0]
@@ -209,8 +285,9 @@ function advanceStreet(state) {
   let next = {
     ...state,
     players,
+    community,
     deckCursor: cursor,
-    street: 'second',
+    street: streets[streets.indexOf(state.street) + 1],
     currentBet: 0,
     minRaise: state.ante,
     actingIndex,
@@ -218,17 +295,20 @@ function advanceStreet(state) {
     runout,
     phase: 'betting',
   }
-  next.log = logLine(next, '두 번째 장', 'system')
+  next.log = logLine(next, logText, 'system')
   return next
 }
 
 /* --------------------------------------------------------------- showdown */
 
 function settle(state, { uncontested }) {
+  // Two private cards plus the shared one; the evaluator keeps whichever pair
+  // ranks best and remembers what else was available.
+  // In rematch mode, each player has 1 private card + 1 community = 2 cards.
   const evaluated = {}
   for (const p of state.players) {
-    if (!p.folded && !p.out && p.hole.length === 2) {
-      evaluated[p.id] = evaluateHand(p.hole)
+    if (!p.folded && !p.out && p.hole.length + state.community.length >= 2) {
+      evaluated[p.id] = evaluateHand([...p.hole, ...state.community])
     }
   }
   const handOf = (id) => evaluated[id]
@@ -250,7 +330,8 @@ function settle(state, { uncontested }) {
 
   // 구사: a loser holding 4+9 can tear the hand up. The money stays on the
   // table and rides on the next deal, which the same dealer puts out.
-  const voider = uncontested
+  // In rematch mode, 구사 cannot be invoked again (no recursive rematches).
+  const voider = (uncontested || state.rematch)
     ? null
     : players.find(
         (p) => !p.folded && !p.out && !winnerIds.includes(p.id) && canVoid(evaluated[p.id], state.rules),
@@ -275,7 +356,7 @@ function settle(state, { uncontested }) {
         showCards: true,
       },
     }
-    next.log = logLine(next, `${voider.name} 구사 — 판 무효, 판돈 이월`, 'win')
+    next.log = logLine(next, `${voider.name} 구사 — 판 무효, 재경기 (2장 승부)`, 'win')
     return next
   }
 
@@ -320,9 +401,10 @@ export function sutdaReducer(state, action) {
       return setupGame(state, action.payload)
 
     case 'BEGIN_HAND': {
-      // A voided hand is redealt by the same dealer with the pot still down.
+      // A voided hand triggers a rematch: same dealer, pot carries over,
+      // and the hand plays in simplified 2-card mode (community + 1 private).
       if (state.results?.voided) {
-        return beginHand(state, { keepDealer: true, carryPot: state.results.potSize })
+        return beginHand(state, { keepDealer: true, carryPot: state.results.potSize, rematch: true })
       }
       return beginHand(state)
     }

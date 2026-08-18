@@ -32,45 +32,73 @@ export const BOT_PROFILES = [
     accent: 'cyan',
     style: { aggression: 0.31, bluff: 0.15, tightness: -0.1, label: '초짜' },
   },
+  {
+    name: '점쟁이',
+    avatar: '🔮',
+    accent: 'sky',
+    style: { aggression: 0.48, bluff: 0.18, tightness: -0.02, label: '변덕' },
+  },
 ]
 
 /**
- * Exact win rate against one unknown hand: with only twenty cards in the deck
- * every opponent holding can be enumerated, so there is no need to sample.
- * Ties count as a half so the number reads as pot equity.
+ * Win rate against `opponents` unknown holdings, by simulation.
+ *
+ * Whatever is still face down gets drawn from the same stub the opponents draw
+ * from — the shared card while it is unrevealed, and the player's own second
+ * card before the last street — so an early-street estimate accounts for the
+ * board that has yet to arrive.
  */
-export function headsUpEquity(hole, rules = DEFAULT_RULES) {
-  const known = new Set(hole.map((c) => c.id))
-  const stub = createDeck().filter((c) => !known.has(c.id))
-  const mine = evaluateHand(hole)
-
-  let wins = 0
-  let total = 0
-  for (let i = 0; i < stub.length; i++) {
-    for (let j = i + 1; j < stub.length; j++) {
-      const cmp = compareHands(mine, evaluateHand([stub[i], stub[j]]), rules)
-      wins += cmp > 0 ? 1 : cmp === 0 ? 0.5 : 0
-      total += 1
-    }
-  }
-  return wins / total
-}
-
-/**
- * Win rate against `opponents` unknown hands. Card removal between opponents
- * makes the exact figure expensive, so the heads-up number is compounded —
- * close enough for a bot's decision and far cheaper than sampling.
- */
-export function estimateEquity(hole, opponents, rules = DEFAULT_RULES) {
+export function estimateEquity({
+  hole,
+  community,
+  opponents,
+  rules = DEFAULT_RULES,
+  iterations = 320,
+}) {
   if (opponents <= 0) return 1
-  return headsUpEquity(hole, rules) ** opponents
-}
 
-/** Only one card is face up in the first round; judge it on rank alone. */
-export function singleCardStrength(card) {
-  // A bright card is worth more than its month: it is half of a 광땡.
-  const base = card.month / 10
-  return Math.min(1, card.gwang ? base * 0.6 + 0.45 : base * 0.75)
+  const known = new Set([...hole, ...community].map((c) => c.id))
+  const stub = createDeck().filter((c) => !known.has(c.id))
+
+  const needMine = Math.max(0, 2 - hole.length)
+  const needBoard = Math.max(0, 1 - community.length)
+  const needed = needMine + needBoard + opponents * 2
+  if (stub.length < needed) return 0.5
+
+  let equity = 0
+  for (let iter = 0; iter < iterations; iter++) {
+    // Partial Fisher-Yates: only draw as many cards as this trial needs.
+    const pool = stub.slice()
+    const drawn = []
+    for (let i = 0; i < needed; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+      drawn.push(pool[i])
+    }
+
+    let at = 0
+    const board = community.concat(drawn.slice(at, at + needBoard))
+    at += needBoard
+    const mine = evaluateHand([...hole, ...drawn.slice(at, at + needMine), ...board])
+    at += needMine
+
+    let lost = false
+    let tied = 0
+    for (let o = 0; o < opponents; o++) {
+      const theirs = evaluateHand([drawn[at], drawn[at + 1], ...board])
+      at += 2
+      const cmp = compareHands(mine, theirs, rules)
+      if (cmp < 0) {
+        lost = true
+        break
+      }
+      if (cmp === 0) tied += 1
+    }
+
+    if (!lost) equity += tied === 0 ? 1 : 1 / (tied + 1)
+  }
+
+  return equity / iterations
 }
 
 function pick(probability) {
@@ -86,10 +114,14 @@ export function decideAction({ player, state, legal, opponents }) {
   const pot = state.players.reduce((sum, p) => sum + p.committed, 0) + (state.carryPot ?? 0)
   const toCall = legal.callAmount
 
-  const equity =
-    player.hole.length < 2
-      ? 0.3 + singleCardStrength(player.hole[0]) * 0.45
-      : estimateEquity(player.hole, opponents, state.rules)
+  const equity = estimateEquity({
+    hole: player.hole,
+    community: state.community ?? [],
+    opponents,
+    rules: state.rules,
+    // The first street has the most unknowns and the least at stake.
+    iterations: player.hole.length < 2 ? 220 : 320,
+  })
 
   const potOdds = toCall > 0 ? toCall / (pot + toCall) : 0
   const edge = equity - potOdds - style.tightness
@@ -112,7 +144,7 @@ export function decideAction({ player, state, legal, opponents }) {
     return { type: 'check', equity }
   }
 
-  // A 광땡 or a big 땡 is worth the whole stack.
+  // A 광땡, or a big 땡 nobody can catch, is worth the whole stack.
   if (equity > 0.9 && legal.canRaise) {
     if (legal.maxRaiseTotal <= pot || pick(0.35)) {
       return { type: 'allin', amount: legal.maxRaiseTotal, equity }

@@ -3,6 +3,8 @@ import { Coins, Crown, ShieldAlert, Swords } from 'lucide-react'
 import SutdaCard from './SutdaCard'
 import { ROW_STEP } from '../components/ShowdownBoard'
 
+const CARD_STEP = 0.08
+
 const OVERRIDE_BADGE = {
   amhaengeosa: { label: '암행어사', icon: ShieldAlert, tone: 'bg-sky-600/90 text-white' },
   ttaengjabi: { label: '땡잡이', icon: Swords, tone: 'bg-violet-600/90 text-white' },
@@ -17,9 +19,13 @@ function badgesFor(hand, rules) {
   return out
 }
 
-function HandRow({ player, isWinner, payout, delay, total, rules }) {
+function HandRow({ player, isWinner, payout, delay, total, rules, community }) {
   const hand = player.handResult
   const badges = badgesFor(hand, rules)
+  // Which two of the three actually made the hand, and which came off the board.
+  const usedIds = new Set((hand?.cards ?? []).map((c) => c.id))
+  const communityIds = new Set(community.map((c) => c.id))
+  const shown = [...player.hole, ...community]
 
   return (
     <motion.div
@@ -44,9 +50,26 @@ function HandRow({ player, isWinner, payout, delay, total, rules }) {
         <span className="min-w-0 truncate text-sm font-bold text-white">{player.name}</span>
       </div>
 
-      <div className="flex items-end gap-1.5">
-        {player.hole.map((card, i) => (
-          <SutdaCard key={card.id} card={card} size="sm" index={i} baseDelay={delay + 0.12} />
+      <div className="order-last flex w-full items-end gap-1.5 sm:order-none sm:w-auto">
+        {shown.map((card, i) => (
+          <div key={card.id} className="flex flex-col items-center gap-1">
+            <SutdaCard
+              card={card}
+              size="sm"
+              index={i}
+              baseDelay={delay + 0.12}
+              dim={!usedIds.has(card.id)}
+              highlight={usedIds.has(card.id)}
+            />
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: delay + 0.12 + i * CARD_STEP + 0.25 }}
+              className={`h-1 w-6 rounded-full ${
+                communityIds.has(card.id) ? 'bg-emerald-400/40' : 'bg-brass-400'
+              }`}
+            />
+          </div>
         ))}
       </div>
 
@@ -110,7 +133,7 @@ function HandRow({ player, isWinner, payout, delay, total, rules }) {
 }
 
 /** Every live hand turned face up, weakest first, winner last. */
-export default function SutdaShowdown({ players, results, rules, onNext }) {
+export default function SutdaShowdown({ players, results, rules, community = [], onNext }) {
   const contenders = players.filter((p) => !p.folded && !p.out && p.handResult)
   const ranked = [...contenders].sort(
     (a, b) => (a.handResult?.score ?? 0) - (b.handResult?.score ?? 0),
@@ -145,10 +168,10 @@ export default function SutdaShowdown({ players, results, rules, onNext }) {
             className="mb-2 rounded-xl border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-center"
           >
             <span className="text-sm font-bold text-amber-300">
-              {voidedBy.name}의 구사 — 판을 무릅니다
+              {voidedBy.name}의 구사 — 재경기로 넘어갑니다
             </span>
             <span className="mt-0.5 block text-[11px] text-amber-100/60">
-              판돈 {results.potSize.toLocaleString()}이 다음 판으로 넘어갑니다
+              판돈 {results.potSize.toLocaleString()} 이월 · 공유카드 1장 + 손패 1장으로 승부
             </span>
           </motion.div>
         )}
@@ -161,11 +184,27 @@ export default function SutdaShowdown({ players, results, rules, onNext }) {
               total={ranked.length}
               delay={i * ROW_STEP}
               rules={rules}
+              community={community}
               isWinner={results.winnerIds.includes(player.id)}
               payout={results.payouts?.[player.id] ?? 0}
             />
           ))}
         </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: ranked.length * ROW_STEP }}
+          className="mt-2 flex items-center justify-center gap-4 text-[10px] text-emerald-100/40"
+        >
+          <span className="flex items-center gap-1">
+            <span className="h-1 w-5 rounded-full bg-brass-400" /> 내 패
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-1 w-5 rounded-full bg-emerald-400/40" /> 공유카드
+          </span>
+          <span className="text-emerald-100/30">밝은 두 장이 지은 패</span>
+        </motion.div>
 
         {onNext && (
           <motion.button
@@ -176,7 +215,7 @@ export default function SutdaShowdown({ players, results, rules, onNext }) {
             onClick={onNext}
             className="mt-3 shrink-0 self-center rounded-xl bg-brass-500 px-8 py-3 text-base font-black text-black shadow-lg shadow-brass-500/25 hover:bg-brass-400"
           >
-            {results.voided ? '다시 돌리기 →' : '다음 판 →'}
+            {results.voided ? '재경기 →' : '다음 판 →'}
           </motion.button>
         )}
       </div>

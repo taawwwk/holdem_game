@@ -76,16 +76,20 @@ export default function SutdaSetup({ onStart, onBack }) {
           >
             🎴
           </motion.div>
-          <h1 className="text-3xl font-black tracking-tight text-white">섰다</h1>
+          <h1 className="text-3xl font-black tracking-tight text-white">홀덤 섰다</h1>
           <p className="mt-1 text-sm text-emerald-100/50">
-            화투 20장 · 두 장으로 겨루는 한판 승부
+            내 패 한 장 → 공유카드 공개 → 마지막 한 장. 세 번 베팅합니다.
+          </p>
+          <p className="mt-2 rounded-lg bg-felt-900/70 px-3 py-2 text-[11px] leading-relaxed text-emerald-100/45">
+            내 두 장과 가운데 공유카드, 그 셋 중 <b className="text-brass-400/90">가장 좋은 두 장</b>으로
+            겨룹니다. 공유카드와 같은 월을 쥐면 땡, 공유카드가 광이면 광땡이 열립니다.
           </p>
         </div>
 
         <div className="space-y-3">
           <OptionRow icon={Users} label="AI 상대 수" hint={`총 ${botCount + 1}명`}>
-            <div className="grid grid-cols-5 gap-2">
-              {[1, 2, 3, 4, 5].map((n) => (
+            <div className="grid grid-cols-6 gap-2">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
                 <button key={n} onClick={() => setBotCount(n)} className={chipClass(botCount === n)}>
                   {n}
                 </button>
@@ -105,6 +109,11 @@ export default function SutdaSetup({ onStart, onBack }) {
                 </motion.span>
               ))}
             </div>
+            {botCount >= 5 && (
+              <p className="mt-2 text-[11px] text-amber-300/70">
+                인원이 많을수록 공유카드로 만든 땡·광땡이 흔해져 승부가 극단적으로 흐릅니다.
+              </p>
+            )}
           </OptionRow>
 
           <OptionRow icon={Coins} label="시작 칩">

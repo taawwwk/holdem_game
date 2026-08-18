@@ -41,11 +41,16 @@ export default function SutdaTable({ onExit }) {
     <div className="felt-surface flex min-h-screen flex-col">
       <header className="z-20 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brass-500/15 bg-felt-950/70 px-4 py-2 backdrop-blur">
         <span className="text-lg leading-none">🎴</span>
-        <span className="text-sm font-black tracking-tight text-white">섰다</span>
+        <span className="text-sm font-black tracking-tight text-white">홀덤 섰다</span>
         <span className="rounded-full bg-felt-800 px-2 py-0.5 text-[11px] font-semibold text-emerald-100/60">
           {state.handNumber}판
         </span>
         <span className="text-[11px] text-emerald-100/40">앤티 {state.ante}</span>
+        {state.rematch && (
+          <span className="rounded-full bg-amber-500/25 px-2 py-0.5 text-[11px] font-bold text-amber-300">
+            재경기
+          </span>
+        )}
         {state.carryPot > 0 && (
           <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-300">
             이월 {state.carryPot.toLocaleString()}
@@ -87,9 +92,35 @@ export default function SutdaTable({ onExit }) {
             ))}
           </div>
 
-          {/* There is no board in Sutda — the middle of the table is just money. */}
+          {/* The shared card sits in the middle; everyone builds off it. */}
           <div className="table-rail relative my-2 w-full max-w-3xl shrink-0 rounded-[999px] p-1.5">
-            <div className="felt-surface flex flex-col items-center justify-center gap-2 rounded-[999px] px-6 py-8">
+            <div className="felt-surface flex flex-col items-center justify-center gap-2 rounded-[999px] px-6 py-5">
+              <div className="flex h-[6.5rem] items-center">
+                <AnimatePresence mode="wait">
+                  {state.community.length > 0 ? (
+                    <motion.div
+                      key={state.community[0].id}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <SutdaCard card={state.community[0]} size="lg" />
+                      <span className="text-[10px] font-bold tracking-widest text-brass-400/80">
+                        공유
+                      </span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="slot"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex h-[6.5rem] w-[4.6rem] items-center justify-center rounded-lg border border-dashed border-emerald-300/20 bg-emerald-950/25 text-[10px] text-emerald-200/30"
+                    >
+                      공유
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <motion.div
                 layout
                 className="flex items-center gap-2 rounded-full border border-brass-500/25 bg-felt-950/70 px-5 py-2"
@@ -223,6 +254,7 @@ export default function SutdaTable({ onExit }) {
                 players={state.players}
                 results={state.results}
                 rules={state.rules}
+                community={state.community}
                 onNext={
                   state.phase === 'handEnd'
                     ? () => {
