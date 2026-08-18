@@ -153,8 +153,15 @@ export function ShuffleAnimation({ method = 'riffle' }) {
   )
 }
 
-/** Modal shown when the human holds the button. */
-export function ShuffleChoiceModal({ onSelect }) {
+const METHOD_KEYS = Object.keys(SHUFFLE_METHODS)
+
+/** Whoever holds the button, the deck decides how it gets mixed. */
+export function randomMethod() {
+  return METHOD_KEYS[Math.floor(Math.random() * METHOD_KEYS.length)]
+}
+
+/** Kept for reference; the table now always picks the style at random. */
+function ShuffleChoiceModal({ onSelect }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -218,63 +225,53 @@ export function ShuffleChoiceModal({ onSelect }) {
  * Drives the whole shuffle beat: pick a style (human dealer) or announce the
  * bot's shuffle, play it, then hand control back for the deal.
  */
-export default function ShuffleStage({ dealerName, dealerIsHuman, onComplete }) {
-  const [playing, setPlaying] = useState(dealerIsHuman ? null : 'riffle')
+export default function ShuffleStage({ dealerName, onComplete }) {
+  // One style is drawn at random per hand, for the player and the bots alike.
+  const [playing] = useState(randomMethod)
 
   useEffect(() => {
-    setPlaying(dealerIsHuman ? null : 'riffle')
-  }, [dealerIsHuman, dealerName])
-
-  useEffect(() => {
-    if (!playing) return
     sfx.shuffle(playing)
-    const ms = SHUFFLE_METHODS[playing].duration
-    const t = setTimeout(() => onComplete(playing), ms)
+    const t = setTimeout(() => onComplete(playing), SHUFFLE_METHODS[playing].duration)
     return () => clearTimeout(t)
   }, [playing, onComplete])
 
-  const method = playing ? SHUFFLE_METHODS[playing] : null
+  const method = SHUFFLE_METHODS[playing]
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-felt-950/75 backdrop-blur-[2px]">
-      <AnimatePresence>
-        {!playing && <ShuffleChoiceModal key="choice" onSelect={setPlaying} />}
-      </AnimatePresence>
-
-      {playing && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex w-full max-w-md flex-col items-center px-6"
-        >
-          <div className="mb-2 flex items-center gap-2 text-brass-400">
-            <motion.span
-              animate={{ rotate: [0, 12, -12, 0] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <Shuffle className="h-5 w-5" />
-            </motion.span>
-            <span className="text-lg font-semibold">
-              {dealerIsHuman ? `${method.ko} 진행 중...` : `${dealerName}이(가) 카드를 섞는 중...`}
-            </span>
-          </div>
-          <p className="mb-2 text-xs text-emerald-100/50">{method.desc}</p>
-
-          <ShuffleAnimation method={playing} />
-
-          <motion.div
-            className="mt-2 h-1 w-56 overflow-hidden rounded-full bg-emerald-950/70"
-            initial={false}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex w-full max-w-md flex-col items-center px-6"
+      >
+        <div className="mb-1 flex items-center gap-2 text-brass-400">
+          <motion.span
+            animate={{ rotate: [0, 12, -12, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <motion.div
-              className="h-full bg-brass-400"
-              initial={{ width: '0%' }}
-              animate={{ width: '100%' }}
-              transition={{ duration: method.duration / 1000, ease: 'linear' }}
-            />
-          </motion.div>
-        </motion.div>
-      )}
+            <Shuffle className="h-5 w-5" />
+          </motion.span>
+          <span className="text-lg font-semibold">{dealerName}이(가) 카드를 섞는 중...</span>
+        </div>
+
+        <div className="mb-2 flex items-center gap-2">
+          <span className="rounded-full bg-brass-500/15 px-2.5 py-0.5 text-xs font-bold text-brass-400">
+            {method.name}
+          </span>
+          <span className="text-xs text-emerald-100/50">{method.desc}</span>
+        </div>
+
+        <ShuffleAnimation method={playing} />
+
+        <div className="mt-2 h-1 w-56 overflow-hidden rounded-full bg-emerald-950/70">
+          <motion.div
+            className="h-full bg-brass-400"
+            initial={{ width: '0%' }}
+            animate={{ width: '100%' }}
+            transition={{ duration: method.duration / 1000, ease: 'linear' }}
+          />
+        </div>
+      </motion.div>
     </div>
   )
 }

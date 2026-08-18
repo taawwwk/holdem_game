@@ -18,7 +18,6 @@ export default function SutdaTable({ onExit }) {
     pot,
     actingPlayer,
     legal,
-    dealerIsHuman,
     startGame,
     finishShuffle,
     act,
@@ -241,7 +240,6 @@ export default function SutdaTable({ onExit }) {
               <ShuffleStage
                 key={`shuffle-${state.handNumber}`}
                 dealerName={state.players[state.dealerIndex]?.name ?? 'AI'}
-                dealerIsHuman={dealerIsHuman}
                 onComplete={finishShuffle}
               />
             )}
@@ -287,7 +285,8 @@ export default function SutdaTable({ onExit }) {
           </AnimatePresence>
         </main>
 
-        <aside className="hidden w-64 shrink-0 flex-col gap-3 lg:flex">
+        {/* Sticky and capped: a long game must not stretch the page downward. */}
+        <aside className="hidden w-64 shrink-0 flex-col gap-3 lg:flex lg:sticky lg:top-3 lg:h-[calc(100vh-6rem)] lg:self-start">
           <div className="rounded-xl border border-emerald-400/12 bg-felt-950/60 p-3">
             <div className="mb-2 text-[11px] font-bold tracking-widest text-emerald-100/40">
               CHIP COUNT
@@ -309,7 +308,7 @@ export default function SutdaTable({ onExit }) {
               ))}
             </div>
           </div>
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <ActionLog log={state.log} />
           </div>
         </aside>

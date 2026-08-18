@@ -1,11 +1,12 @@
 import { forwardRef } from 'react'
 import { motion } from 'framer-motion'
-import { MONTH_INFO } from './deck.js'
+
+import HwatuArt from './HwatuArt'
 
 const SIZES = {
-  sm: { box: 'w-10 h-14', round: 'rounded-[5px]', num: 'text-sm', motif: 'text-base', name: 'text-[7px]' },
-  md: { box: 'w-14 h-20', round: 'rounded-md', num: 'text-lg', motif: 'text-2xl', name: 'text-[9px]' },
-  lg: { box: 'w-[4.6rem] h-[6.5rem]', round: 'rounded-lg', num: 'text-xl', motif: 'text-3xl', name: 'text-[10px]' },
+  sm: { box: 'w-10 h-14', round: 'rounded-[5px]', num: 'text-[9px]', name: 'hidden' },
+  md: { box: 'w-14 h-20', round: 'rounded-md', num: 'text-xs', name: 'text-[8px]' },
+  lg: { box: 'w-[4.6rem] h-[6.5rem]', round: 'rounded-lg', num: 'text-sm', name: 'text-[9px]' },
 }
 
 /**
@@ -18,7 +19,7 @@ const SutdaCard = forwardRef(function SutdaCard(
   ref,
 ) {
   const s = SIZES[size]
-  const info = card ? MONTH_INFO[card.month] : null
+
 
   return (
     <motion.div
@@ -46,18 +47,23 @@ const SutdaCard = forwardRef(function SutdaCard(
           </div>
         ) : (
           <div
-            className={`hwatu-face relative flex h-full w-full flex-col items-center justify-between overflow-hidden py-1 ${s.round} ${
+            className={`hwatu-face relative h-full w-full overflow-hidden ${s.round} ${
               card.gwang ? 'hwatu-gwang' : ''
             }`}
           >
-            <span className={`${s.num} font-black leading-none text-rose-800`}>{card.month}</span>
-            <span className={`${s.motif} leading-none`}>{info.motif}</span>
-            <span className={`${s.name} font-semibold leading-none text-stone-600`}>
-              {info.name}
+            <HwatuArt month={card.month} gwang={card.gwang} />
+
+            {/* Month index in the corner — the painting alone is hard to read
+                at seat size, and Sutda is decided by the number. Nothing else
+                sits on top of the art, so no legs or cups get covered. */}
+            <span
+              className={`absolute top-0 left-0 ${s.num} rounded-br bg-stone-900/75 px-1 font-black leading-tight text-amber-50`}
+            >
+              {card.month}
             </span>
 
             {card.gwang && (
-              <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-700 text-[8px] font-black text-amber-200 shadow">
+              <span className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-700 text-[8px] font-black text-amber-200 shadow ring-1 ring-amber-200/70">
                 光
               </span>
             )}
