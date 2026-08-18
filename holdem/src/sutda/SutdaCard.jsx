@@ -52,7 +52,12 @@ const SutdaCard = forwardRef(function SutdaCard(
             <img
               src={`${import.meta.env.BASE_URL}cards/${card.id}.jpg`}
               alt={`${card.month}월`}
-              className="pointer-events-none h-full w-full object-cover"
+              className="pointer-events-none h-full w-full scale-[1.18] object-cover origin-center"
+            />
+            <div
+              className={`pointer-events-none absolute inset-0 ${
+                card.gwang ? 'shadow-[inset_0_0_0_2px_#b45309]' : 'shadow-[inset_0_0_0_2px_#b91c1c]'
+              }`}
             />
 
             {/* Month index in the corner — the painting alone is hard to read
