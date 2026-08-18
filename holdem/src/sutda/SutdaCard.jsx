@@ -50,7 +50,7 @@ const SutdaCard = forwardRef(function SutdaCard(
             }`}
           >
             <img
-              src={`/cards/${card.id}.jpg`}
+              src={`${import.meta.env.BASE_URL}cards/${card.id}.jpg`}
               alt={`${card.month}월`}
               className="pointer-events-none h-full w-full object-cover"
             />
