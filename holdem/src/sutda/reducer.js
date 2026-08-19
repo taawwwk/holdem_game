@@ -115,9 +115,18 @@ function setupGame(state, { botCount, startingChips, ante, rules }) {
   }
 }
 
-function beginHand(state, { keepDealer = false, carryPot = 0, rematch = false } = {}) {
-  const players = freshHandPlayers(state.players)
-  if (seatOrder(players).length < 2) {
+function beginHand(state, { keepDealer = false, carryPot = 0, rematch = false, foldedIds = [] } = {}) {
+  let players = freshHandPlayers(state.players)
+
+  // In a rematch, players who folded in the original hand sit this one out.
+  // They keep their chips but don't ante or receive cards.
+  if (rematch && foldedIds.length > 0) {
+    players = players.map((p) =>
+      foldedIds.includes(p.id) ? { ...p, folded: true } : p,
+    )
+  }
+
+  if (seatOrder(players).filter((i) => !players[i].folded).length < 2) {
     return { ...state, players, phase: 'gameOver' }
   }
 
@@ -159,10 +168,15 @@ function dealHand(state, method) {
     // ── Rematch mode (구사 재경기) ──────────────────────────────
     // Community card dealt face-up immediately, then one private card each.
     // A single betting round follows, then straight to showdown.
-    const community = [deck[cursor++]]
-    for (const seat of order) players[seat].hole.push(deck[cursor++])
+    // Only players who didn't fold in the original hand participate.
+    const activeOrder = order.filter((seat) => !players[seat].folded)
 
-    const firstSeat = order[0]
+    for (const seat of activeOrder) postAnte(players[seat], state.ante)
+
+    const community = [deck[cursor++]]
+    for (const seat of activeOrder) players[seat].hole.push(deck[cursor++])
+
+    const firstSeat = activeOrder[0]
     const draft = { ...state, players, currentBet: 0, minRaise: state.ante }
     const preComplete = isRoundComplete(draft)
     const actingIndex = players[firstSeat].folded || players[firstSeat].allIn
@@ -185,9 +199,11 @@ function dealHand(state, method) {
       phase: 'dealing',
     }
     const carry = state.carryPot > 0 ? ` · 이월 ${state.carryPot}` : ''
+    const sitOut = order.length - activeOrder.length
+    const sitOutText = sitOut > 0 ? ` · ${sitOut}명 불참` : ''
     next.log = logLine(
       next,
-      `${next.handNumber}판 재경기 — 공유카드 ${cardLabel(community[0])} · 앤티 ${state.ante}${carry}`,
+      `${next.handNumber}판 재경기 — 공유카드 ${cardLabel(community[0])} · 앤티 ${state.ante}${carry}${sitOutText}`,
       'system',
     )
     return next
@@ -338,6 +354,11 @@ function settle(state, { uncontested }) {
       )
 
   if (voider) {
+    // Remember who had already folded so they sit out the rematch.
+    const foldedIds = state.players
+      .filter((p) => p.folded && !p.out)
+      .map((p) => p.id)
+
     let next = {
       ...state,
       players: state.players.map((p) => ({ ...p, handResult: evaluated[p.id] ?? null })),
@@ -349,6 +370,7 @@ function settle(state, { uncontested }) {
         uncontested: false,
         voided: true,
         voidedBy: voider.id,
+        foldedIds,
         pots: [],
         payouts: {},
         winnerIds: [],
@@ -403,8 +425,14 @@ export function sutdaReducer(state, action) {
     case 'BEGIN_HAND': {
       // A voided hand triggers a rematch: same dealer, pot carries over,
       // and the hand plays in simplified 2-card mode (community + 1 private).
+      // Players who had already folded sit out the rematch.
       if (state.results?.voided) {
-        return beginHand(state, { keepDealer: true, carryPot: state.results.potSize, rematch: true })
+        return beginHand(state, {
+          keepDealer: true,
+          carryPot: state.results.potSize,
+          rematch: true,
+          foldedIds: state.results.foldedIds ?? [],
+        })
       }
       return beginHand(state)
     }
