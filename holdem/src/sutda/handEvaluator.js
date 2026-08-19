@@ -168,23 +168,28 @@ export function overrideUsed(hand, other, rules = DEFAULT_RULES) {
 /**
  * Resolves a contested pot. The overrides are deliberately circular —
  * 암행어사 beats 18광땡, which beats 장땡, which beats 암행어사 — so a
- * three-way showdown can have no undisputed winner. Only then does the pot
- * fall back to plain rank, which always resolves.
+ * three-way showdown can have no undisputed winner.
+ *
+ * Strategy: a candidate is "unbeaten" if no other contender beats them
+ * head-to-head.  When no unbeaten player exists (true circular dominance),
+ * the pot falls back to plain rank, which always resolves.
  */
 export function pickWinners(ids, handOf, rules = DEFAULT_RULES) {
+  if (ids.length <= 1) return [...ids]
+
+  // Find players that nobody else can beat head-to-head.
+  const unbeaten = ids.filter((id) => {
+    const hand = handOf(id)
+    return ids.every((otherId) => {
+      if (otherId === id) return true
+      return compareHands(hand, handOf(otherId), rules) >= 0
+    })
+  })
+
+  if (unbeaten.length > 0) return unbeaten
+
+  // True circular dominance — fall back to plain score.
   const scoreOf = (id) => handOf(id)?.score ?? -1
-
-  let best = [ids[0]]
-  for (const id of ids.slice(1)) {
-    const cmp = compareHands(handOf(id), handOf(best[0]), rules)
-    if (cmp > 0) best = [id]
-    else if (cmp === 0) best.push(id)
-  }
-
-  const champion = handOf(best[0])
-  const undisputed = ids.every((id) => compareHands(champion, handOf(id), rules) >= 0)
-  if (undisputed) return best
-
   const top = Math.max(...ids.map(scoreOf))
   return ids.filter((id) => scoreOf(id) === top)
 }
