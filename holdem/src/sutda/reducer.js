@@ -115,18 +115,27 @@ function setupGame(state, { botCount, startingChips, ante, rules }) {
   }
 }
 
-function beginHand(state, { keepDealer = false, carryPot = 0, rematch = false, foldedIds = [] } = {}) {
+function beginHand(state, { keepDealer = false, carryPot = 0, rematch = false, foldedIds = [], allInIds = [] } = {}) {
   let players = freshHandPlayers(state.players)
 
-  // In a rematch, players who folded in the original hand sit this one out.
-  // They keep their chips but don't ante or receive cards.
-  if (rematch && foldedIds.length > 0) {
-    players = players.map((p) =>
-      foldedIds.includes(p.id) ? { ...p, folded: true } : p,
-    )
+  if (rematch) {
+    // Players who folded in the original hand sit this one out.
+    // Players who were all-in (0 chips) stay in — they already have stake
+    // in the carry pot and deserve to compete. They start all-in and don't
+    // ante again.
+    players = players.map((p) => {
+      if (foldedIds.includes(p.id)) {
+        return { ...p, folded: true }
+      }
+      if (allInIds.includes(p.id) && p.chips <= 0) {
+        return { ...p, out: false, folded: false, allIn: true }
+      }
+      return p
+    })
   }
 
-  if (seatOrder(players).filter((i) => !players[i].folded).length < 2) {
+  const activeCount = players.filter((p) => !p.out && !p.folded).length
+  if (activeCount < 2) {
     return { ...state, players, phase: 'gameOver' }
   }
 
@@ -169,9 +178,12 @@ function dealHand(state, method) {
     // Community card dealt face-up immediately, then one private card each.
     // A single betting round follows, then straight to showdown.
     // Only players who didn't fold in the original hand participate.
+    // All-in players from the original hand get cards but don't ante again.
     const activeOrder = order.filter((seat) => !players[seat].folded)
 
-    for (const seat of activeOrder) postAnte(players[seat], state.ante)
+    for (const seat of activeOrder) {
+      if (!players[seat].allIn) postAnte(players[seat], state.ante)
+    }
 
     const community = [deck[cursor++]]
     for (const seat of activeOrder) players[seat].hole.push(deck[cursor++])
@@ -354,9 +366,13 @@ function settle(state, { uncontested }) {
       )
 
   if (voider) {
-    // Remember who had already folded so they sit out the rematch.
+    // Remember who had already folded and who was all-in so the rematch
+    // can exclude folders but keep all-in players in the game.
     const foldedIds = state.players
       .filter((p) => p.folded && !p.out)
+      .map((p) => p.id)
+    const allInIds = state.players
+      .filter((p) => p.allIn && !p.folded && !p.out)
       .map((p) => p.id)
 
     let next = {
@@ -371,6 +387,7 @@ function settle(state, { uncontested }) {
         voided: true,
         voidedBy: voider.id,
         foldedIds,
+        allInIds,
         pots: [],
         payouts: {},
         winnerIds: [],
@@ -432,6 +449,7 @@ export function sutdaReducer(state, action) {
           carryPot: state.results.potSize,
           rematch: true,
           foldedIds: state.results.foldedIds ?? [],
+          allInIds: state.results.allInIds ?? [],
         })
       }
       return beginHand(state)
