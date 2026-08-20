@@ -4,9 +4,9 @@
  * A hand is two private cards plus the one shared card, and the player uses
  * whichever two of those three make the best pair. Most of the ladder is a
  * plain total order, captured by `score`. Two optional house rules break it on
- * purpose — 암행어사 beats the lesser 광땡, 땡잡이 beats any 땡, and both are
- * feeble 끗 hands against anything else — so they live in `compareHands`
- * rather than in the score.
+ * purpose — 암행어사 beats the lesser 광땡, 땡잡이 beats 1~9땡, and both are
+ * feeble 끗 hands against anything else — so they live in `pickWinners`
+ * via a promotion model rather than in the base score.
  *
  * Because a player holds three cards, more than one combination is available
  * at once. That is what makes a shared 7 interesting: with a 3 and a 4 in hand
@@ -33,9 +33,18 @@ const SPECIAL_PAIRS = [
 /** House rules that can be switched off. */
 export const DEFAULT_RULES = {
   amhaengeosa: true, // 4+7 beats 13광땡 / 18광땡
-  ttaengjabi: true, // 3+7 beats any 땡
-  gusa: false, // 4+9 lets a loser void the hand
+  ttaengjabi: true, // 3+7 beats 1~9땡 (장땡 면역)
+  gusa: false, // 4+9 lets a loser void the hand (알리 이하만)
 }
+
+/** Score cap for 구사 activation — 알리 (highest 중간족보). */
+export const GUSA_CEILING = CATEGORY.SPECIAL * 100 + 6 // 306
+
+/** Promoted score for 땡잡이 when target exists — between 9땡 and 장땡. */
+const TTAENGJABI_PROMOTED = CATEGORY.TTAENG * 100 + 9.5 // 409.5
+
+/** Promoted score for 암행어사 when target exists — between 18광땡 and 38광땡. */
+const AMHAENGEOSA_PROMOTED = CATEGORY.GWANGTTAENG * 100 + 2.5 // 502.5
 
 function is(months, a, b) {
   return months[0] === a && months[1] === b
@@ -66,7 +75,7 @@ export function evaluateCombo(cards) {
     name = '18광땡'
   } else if (bothGwang && is(months, 1, 3)) {
     category = CATEGORY.GWANGTTAENG
-    sub = 1
+    sub = 2 // FIX: 13광땡 = 18광땡 (동률)
     name = '13광땡'
   } else if (lo === hi) {
     category = CATEGORY.TTAENG
@@ -135,7 +144,8 @@ function overrides(hand, other, rules) {
     if (other.category === CATEGORY.GWANGTTAENG && other.sub < 3) return true
   }
   if (rules.ttaengjabi && hand.ttaengjabi) {
-    if (other.category === CATEGORY.TTAENG) return true
+    // FIX: 장땡(10땡)은 땡잡이에게 면역
+    if (other.category === CATEGORY.TTAENG && other.sub < 10) return true
   }
   return false
 }
@@ -168,36 +178,42 @@ export function overrideUsed(hand, other, rules = DEFAULT_RULES) {
 /**
  * Resolves a contested pot.
  *
- * Override hands (암행어사, 땡잡이) act as "assassins": they eliminate their
- * target from contention, then everyone left — including the assassin —
- * competes by plain score.
+ * Override hands (잡이패) use a **promotion model**: when a valid target
+ * exists among opponents, the 잡이패 holder's effective score is promoted
+ * to its designated rank. Otherwise it stays at its feeble 끗 score.
  *
- * Example:  땡잡이(8끗) vs 7땡 vs 갑오
- *   → 땡잡이 kills 7땡
- *   → survivors: 8끗 vs 갑오 → 갑오 wins
+ * Promotion ranks (per official Sutda rules):
+ *   땡잡이 → between 9땡(409) and 장땡(410)  = 409.5
+ *   암행어사 → between 18광땡(502) and 38광땡(503) = 502.5
+ *
+ * Example:  땡잡이 vs 5땡 vs 알리
+ *   → 5땡 exists → 땡잡이 promoted to 409.5
+ *   → 409.5 > 306(알리) > 405(5땡 beaten) → 땡잡이 wins
  */
 export function pickWinners(ids, handOf, rules = DEFAULT_RULES) {
   if (ids.length <= 1) return [...ids]
 
-  // Step 1 — Identify "killed" players: any player whose hand is beaten
-  // by another player's override (암행어사 kills 광땡, 땡잡이 kills 땡).
-  const killed = new Set()
-  for (const targetId of ids) {
-    for (const hunterId of ids) {
-      if (hunterId !== targetId && overrides(handOf(hunterId), handOf(targetId), rules)) {
-        killed.add(targetId)
-        break
-      }
-    }
+  // Scan for override targets among all contenders.
+  const has1to9Ttaeng = ids.some((id) => {
+    const h = handOf(id)
+    return h && h.category === CATEGORY.TTAENG && h.sub < 10
+  })
+  const hasTargetGwangttaeng = ids.some((id) => {
+    const h = handOf(id)
+    return h && h.category === CATEGORY.GWANGTTAENG && h.sub < 3
+  })
+
+  // Compute effective score: promote 잡이패 when their target exists.
+  const effectiveScore = (id) => {
+    const h = handOf(id)
+    if (!h) return -1
+    if (rules.ttaengjabi && h.ttaengjabi && has1to9Ttaeng) return TTAENGJABI_PROMOTED
+    if (rules.amhaengeosa && h.amhaengeosa && hasTargetGwangttaeng) return AMHAENGEOSA_PROMOTED
+    return h.score
   }
 
-  // Step 2 — Remove killed players; among survivors, highest score wins.
-  const survivors = ids.filter((id) => !killed.has(id))
-  const pool = survivors.length > 0 ? survivors : ids
-
-  const scoreOf = (id) => handOf(id)?.score ?? -1
-  const top = Math.max(...pool.map(scoreOf))
-  return pool.filter((id) => scoreOf(id) === top)
+  const top = Math.max(...ids.map(effectiveScore))
+  return ids.filter((id) => effectiveScore(id) === top)
 }
 
 /** Whether this holding can void the pot under the 구사 rule. */

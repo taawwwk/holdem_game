@@ -1,5 +1,5 @@
 import { createShuffledDeck, cardLabel } from './deck.js'
-import { DEFAULT_RULES, canVoid, evaluateHand, pickWinners } from './handEvaluator.js'
+import { DEFAULT_RULES, GUSA_CEILING, canVoid, evaluateHand, pickWinners } from './handEvaluator.js'
 import { BOT_PROFILES } from './aiLogic.js'
 import {
   applyBettingAction,
@@ -359,7 +359,11 @@ function settle(state, { uncontested }) {
   // 구사: a loser holding 4+9 can tear the hand up. The money stays on the
   // table and rides on the next deal, which the same dealer puts out.
   // In rematch mode, 구사 cannot be invoked again (no recursive rematches).
-  const voider = (uncontested || state.rematch)
+  // 구사 can only be invoked if the winner's hand is 알리 (score <= 306) or lower.
+  const winnerHand = evaluated[winnerIds[0]]
+  const gusaAllowed = winnerHand && winnerHand.score <= GUSA_CEILING
+
+  const voider = (uncontested || state.rematch || !gusaAllowed)
     ? null
     : players.find(
         (p) => !p.folded && !p.out && !winnerIds.includes(p.id) && canVoid(evaluated[p.id], state.rules),
