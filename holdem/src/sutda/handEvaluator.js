@@ -166,32 +166,38 @@ export function overrideUsed(hand, other, rules = DEFAULT_RULES) {
 }
 
 /**
- * Resolves a contested pot. The overrides are deliberately circular —
- * 암행어사 beats 18광땡, which beats 장땡, which beats 암행어사 — so a
- * three-way showdown can have no undisputed winner.
+ * Resolves a contested pot.
  *
- * Strategy: a candidate is "unbeaten" if no other contender beats them
- * head-to-head.  When no unbeaten player exists (true circular dominance),
- * the pot falls back to plain rank, which always resolves.
+ * Override hands (암행어사, 땡잡이) act as "assassins": they eliminate their
+ * target from contention, then everyone left — including the assassin —
+ * competes by plain score.
+ *
+ * Example:  땡잡이(8끗) vs 7땡 vs 갑오
+ *   → 땡잡이 kills 7땡
+ *   → survivors: 8끗 vs 갑오 → 갑오 wins
  */
 export function pickWinners(ids, handOf, rules = DEFAULT_RULES) {
   if (ids.length <= 1) return [...ids]
 
-  // Find players that nobody else can beat head-to-head.
-  const unbeaten = ids.filter((id) => {
-    const hand = handOf(id)
-    return ids.every((otherId) => {
-      if (otherId === id) return true
-      return compareHands(hand, handOf(otherId), rules) >= 0
-    })
-  })
+  // Step 1 — Identify "killed" players: any player whose hand is beaten
+  // by another player's override (암행어사 kills 광땡, 땡잡이 kills 땡).
+  const killed = new Set()
+  for (const targetId of ids) {
+    for (const hunterId of ids) {
+      if (hunterId !== targetId && overrides(handOf(hunterId), handOf(targetId), rules)) {
+        killed.add(targetId)
+        break
+      }
+    }
+  }
 
-  if (unbeaten.length > 0) return unbeaten
+  // Step 2 — Remove killed players; among survivors, highest score wins.
+  const survivors = ids.filter((id) => !killed.has(id))
+  const pool = survivors.length > 0 ? survivors : ids
 
-  // True circular dominance — fall back to plain score.
   const scoreOf = (id) => handOf(id)?.score ?? -1
-  const top = Math.max(...ids.map(scoreOf))
-  return ids.filter((id) => scoreOf(id) === top)
+  const top = Math.max(...pool.map(scoreOf))
+  return pool.filter((id) => scoreOf(id) === top)
 }
 
 /** Whether this holding can void the pot under the 구사 rule. */
