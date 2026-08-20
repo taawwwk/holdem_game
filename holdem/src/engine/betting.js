@@ -274,11 +274,12 @@ export function awardPots({ players: input, pickWinners, uncontested, carry = 0 
   for (const pot of pots) {
     const eligible = pot.eligible.filter((id) => !byId[id].folded)
 
-    // No live player reached this slice — it is an uncalled bet, so it goes
-    // back to whoever put it in rather than being swept into someone's stack.
-    if (eligible.length === 0) {
+    // If no one is eligible, or if we are at showdown and only ONE player is
+    // eligible for this slice, it means these chips are unmatched. They are
+    // refunded to the original contributors rather than paid out as a "win".
+    if (eligible.length === 0 || (!uncontested && eligible.length === 1)) {
       for (const [id, part] of Object.entries(pot.contributions)) {
-        payouts[id] = (payouts[id] ?? 0) + part
+        byId[id].chips += part
         refunded += part
       }
       continue
