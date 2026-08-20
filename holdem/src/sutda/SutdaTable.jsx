@@ -5,6 +5,7 @@ import { STREET_LABEL } from './reducer.js'
 import SutdaSetup from './SutdaSetup'
 import SutdaCard from './SutdaCard'
 import SutdaShowdown from './SutdaShowdown'
+import SutdaHelper from './SutdaHelper'
 import PlayerSeat from '../components/PlayerSeat'
 import BettingControls from '../components/BettingControls'
 import ShuffleStage from '../components/ShuffleStage'
@@ -319,28 +320,10 @@ export default function SutdaTable({ onExit }) {
 
         {/* Sticky and capped: a long game must not stretch the page downward. */}
         <aside className="hidden w-64 shrink-0 flex-col gap-3 lg:flex lg:sticky lg:top-3 lg:h-[calc(100vh-6rem)] lg:self-start">
-          <div className="rounded-xl border border-emerald-400/12 bg-felt-950/60 p-3">
-            <div className="mb-2 text-[11px] font-bold tracking-widest text-emerald-100/40">
-              CHIP COUNT
-            </div>
-            <div className="space-y-1.5">
-              {state.players.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 text-xs">
-                  <span>{p.avatar}</span>
-                  <span
-                    className={`flex-1 truncate ${p.out ? 'text-slate-500 line-through' : 'text-emerald-50/80'}`}
-                  >
-                    {p.name}
-                  </span>
-                  <span className="flex items-center gap-1 font-bold tabular-nums text-brass-400">
-                    <Coins className="h-3 w-3" />
-                    {p.chips.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <SutdaHelper />
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
             <ActionLog log={state.log} />
           </div>
         </aside>
